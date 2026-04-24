@@ -1,0 +1,27 @@
+#COLORS
+
+BLUE = (0,0,255)
+RED = (255,0,0)
+GREEN = (0,255,0)
+YELLOW = (255,255,0)
+WHITE = (255,255,255)
+BLACK = (0,0,0)
+
+
+#SQAURE PROPERTIES
+
+SQUARE_LEN = 20
+BORDER_WIDTH = 2
+
+#SCREEN PROPERTIES
+
+SCREEN_X = 1000
+SCREEN_Y = 800
+
+#BOARD PROPERTIES
+
+BOARD_X_LEN = 30
+BOARD_Y_LEN = 30
+
+BOARD_X_START = 0 + SQUARE_LEN #leave a square long border for x
+BOARD_Y_START = (SCREEN_Y-(BOARD_Y_LEN*SQUARE_LEN)) - SQUARE_LEN #start the board at the bottom and leave a square long border for y
