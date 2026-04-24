@@ -8,7 +8,9 @@ def timer():
     pass
 def print_board(board):
     [print(i) for i in board]
-def draw_board(screen,board,x,y):
+def draw_board(screen,board):
+    x = BOARD_X_START
+    y = BOARD_Y_START
     xi = x
     for i in board:
         for j in i:
@@ -40,15 +42,12 @@ running = True
 
 board = [[''] * BOARD_X_LEN for i in range(BOARD_Y_LEN)]
 
-x=BOARD_X_START
-y=BOARD_Y_START
-
 #game loop
 while running:
     screen.fill(WHITE)
-    draw_board(screen,board,x,y)
+    draw_board(screen,board)
     pygame.display.flip()
-    #close the game when the X button is pressed
+    #close the game when the X button/ESC key is pressed
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
