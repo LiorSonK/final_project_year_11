@@ -1,10 +1,14 @@
+from email.utils import collapse_rfc2231_value
+
 from game_constants import *
 import random
 
 
 class Player:
-    def __init__(self, username,quarter):
+    def __init__(self, username,quarter,color,ip):
         self.username = username
+        self.color = color
+        self.ip = ip
         if quarter==1:
             self.x = random.randint(BOARD_X_LEN/2,BOARD_X_LEN-1)
             self.y = random.randint(0, BOARD_Y_LEN-1)
