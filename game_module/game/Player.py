@@ -1,5 +1,3 @@
-from email.utils import collapse_rfc2231_value
-
 from game_constants import *
 import random
 
