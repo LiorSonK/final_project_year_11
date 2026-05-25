@@ -53,3 +53,6 @@ CD_X = 400
 CD_Y = 200
 
 CD_GO_OFFSET = 200
+
+#FPS
+FPS = 60

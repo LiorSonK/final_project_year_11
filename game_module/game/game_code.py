@@ -14,6 +14,8 @@ color = 'R'
 cr = ['R','G','B','Y','r']
 game = Game(screen,color)
 gamestate = Status.COUNTDOWN
+clock = pygame.time.Clock()
+
 #game loop
 while game.running:
     match gamestate:
@@ -27,5 +29,5 @@ while game.running:
             game.INGAME_handle_events()
         case Status.COMPLETED:
             pass
-
+    clock.tick(FPS)
 pygame.quit()
