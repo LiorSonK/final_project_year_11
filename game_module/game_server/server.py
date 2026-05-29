@@ -6,14 +6,12 @@ from server_class import Server
 def main ():
     global  all_to_die
     server = Server(IP,PORT)
-    server.socket.listen(20)
+    server.start_rooms()
+    server.print_rooms()
     while True:
-        print('\nMain thread: before accepting ...')
-        cli_sock,addr = server.socket.accept()
-        t = threading.Thread(target = server.handle_client, args=(cli_sock,addr))
-        t.start()
-        server.add_thread(t)
-        if server.players == 100:
+        data, addr = server.socket.recvfrom(1024)
+        server.handle_msg(data,addr)
+        if server.playerCount == 100:
             print("overload")
             break
 

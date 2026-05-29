@@ -194,6 +194,7 @@ class Draw:
         self.screen.blit(text, (x,y))
 
 class Status(Enum):
+    LOBBY = -1
     WAITING_FOR_PLAYERS = 0
     COUNTDOWN = 1
     INGAME = 2
