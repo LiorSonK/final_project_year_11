@@ -32,7 +32,8 @@ class Button:
                         self.action()
 
 class Lobby:
-    def __init__(self):
+    def __init__(self,screen):
+        self.screen = screen
         self.buttons = []
         self.rooms_data = []
         self.refresh_button = Button(REFRESH_BUTTON_x, REFRESH_BUTTON_y, REFRESH_BUTTON_WIDTH, REFRESH_BUTTON_HEIGHT,"Refresh",GREY,HOVER_GREY,self.refresh_rooms)
@@ -43,72 +44,40 @@ class Lobby:
 
     def build_room_buttons(self):
         self.buttons = []
-        column1 = COLUMN1_X
-        column2 = COLUMN2_X  # column 2
-        y_start = JOIN_START_Y
-        spacing = JOIN_Y_SPACING
         for i, room in enumerate(self.rooms_data[:MAX_ROOMS]):  # max 14 rooms
             room_id, players, max_players = room
-            if i < MAX_ROOMS/2:
-                x = column1
-                y = y_start + i * spacing
-            else:
-                x = column2
-                y = y_start + (i - MAX_ROOMS/2) * spacing
+            col = i // ROOMS_PER_COLUMN
+            row = i % ROOMS_PER_COLUMN
+            x = COLUMN1_X + col * COLUMN_SPACE
+            y = JOIN_START_Y + row * JOIN_Y_SPACING
             btn = Button(x,y,JOIN_BUTTON_WIDTH,JOIN_BUTTON_HEIGHT,f"Room {room_id} {players}/{max_players}",GREEN,HOVER_GREEN,lambda r=room_id: self.join_room(r))
 
             self.buttons.append(btn)
+
 
     def refresh_rooms(self):
         print("Requesting rooms from server...")
 
     def join_room(self, room_id):
         print(f"Joining room {room_id}")
-
-    def handle_events(self, event):
+    def handle_buttons(self, event):
         self.refresh_button.handle_event(event)
 
         for b in self.buttons:
             b.handle_event(event)
+    def handle_events(self, game):
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                game.running = False
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    game.running = False
+            self.handle_buttons(event)
 
-    def draw(self, screen):
-        screen.fill((40, 40, 40))
+    def draw(self):
+        self.screen.fill((40, 40, 40))
 
-        self.refresh_button.draw(screen)
+        self.refresh_button.draw(self.screen)
 
         for b in self.buttons:
-            b.draw(screen)
-
-
-pygame.init()
-
-WIDTH, HEIGHT = 800, 600
-screen = pygame.display.set_mode((WIDTH, HEIGHT))
-clock = pygame.time.Clock()
-fake_rooms = [
-    (101, 0, 8),   # empty lobby
-    (102, 1, 8),   # just started
-    (103, 6, 8),   # mid game
-    (104, 8, 8),   # full room
-    (105, 3, 4),   # small match
-    (106, 10, 10), # full
-    (107, 2, 6),
-    (108, 5, 6),
-    (109, 1, 2)
-]
-lobby = Lobby()
-lobby.set_rooms(fake_rooms)
-running = True
-while running:
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            running = False
-
-        lobby.handle_events(event)
-
-    lobby.draw(screen)
-
-    pygame.display.flip()
-    clock.tick(60)
-
-pygame.quit()
+            b.draw(self.screen)
