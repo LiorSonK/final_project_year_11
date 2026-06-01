@@ -1,5 +1,6 @@
 import socket
 import json
+import random
 from game_module.game.game_constants import BOARD_X_LEN, BOARD_Y_LEN
 from server_constants import *
 from game_module.game.game_classes import Status
@@ -47,9 +48,11 @@ class Server:
                 for i in self.rooms:
                     if i.room_id==int(room_id):
                         if len(i.players)<4:
-                            player.room = i
-                            i.players.append(player)
-                            to_send = f"JOND\x1E{i.room_id}"
+                            if i.started == False:
+                                player.room = i
+                                player.ready = False
+                                i.players.append(player)
+                                to_send = f"JOND\x1E{i.room_id}"
                 to_send = secure.encrypt(to_send.encode())
                 self.socket.sendto(to_send,addr)
                 if to_send !="":
@@ -61,6 +64,7 @@ class Server:
                     room = player.room
                     player.room.remove_player(player)
                     player.room = None
+                    player.ready = False
                 to_send = f"LEFT\x1E"
                 to_send = secure.encrypt(to_send.encode())
                 self.socket.sendto(to_send,addr)
@@ -77,6 +81,34 @@ class Server:
 
                     msg = f"RDYC\x1E{room.room_id}\x1E{ready_count}"
                     room.broadcast(self.socket, msg)
+
+                    if room.all_ready() and len(room.players) >= 2:
+                        room.assign_colors()
+                        room.assign_spawns()
+                        room.place_players_on_board()
+                        room.game_start_broad(self.socket)
+                        msg = f"CNGE\x1E{player.color}\x1E{player.x}\x1E{player.y}"
+                        room.broadcast(self.socket, msg)
+                        room.started = True
+            if cmd == "MOVE":
+                direction = msg.split('\x1E')[1]
+
+                old_x, old_y = player.x, player.y
+
+                if direction == "UP":
+                    player.y -= 1
+                elif direction == "DOWN":
+                    player.y += 1
+                elif direction == "LEFT":
+                    player.x -= 1
+                elif direction == "RIGHT":
+                    player.x += 1
+
+                player.x = max(0, min(BOARD_X_LEN - 1, player.x))
+                player.y = max(0, min(BOARD_Y_LEN - 1, player.y))
+
+                msg = f"MOVD\x1E{old_x}\x1E{old_y}\x1E{player.x}\x1E{player.y}\x1E{player.color.lower()}"
+                player.room.broadcast(self.socket, msg)
     def find_player(self,addr):
         for player in self.players:
             if player.addr == addr:
@@ -100,7 +132,7 @@ class Room:
         self.max_players = MAX_PLAYERS
         self.players = []
         self.started = False
-        self.board = []
+        self.board = [[''] * BOARD_X_LEN for _ in range(BOARD_Y_LEN)]
         self.colors_left = ['r', 'g', 'b', 'y']
 
         self.state = Status.WAITING_FOR_PLAYERS
@@ -134,6 +166,39 @@ class Room:
             sec = SecureSession(player.aes_key)
             encrypted = sec.encrypt(msg.encode())
             socket.sendto(encrypted, player.addr)
+
+    def assign_colors(self):
+        random.shuffle(self.colors_left)
+
+        for i in range(len(self.players)):
+            self.players[i].color = self.colors_left[i]
+
+    def assign_spawns(self):
+        for player in self.players:
+            player.x = random.randint(0, BOARD_X_LEN - 1)
+            player.y = random.randint(0, BOARD_Y_LEN - 1)
+
+    def place_players_on_board(self):
+        for player in self.players:
+            x, y = player.x, player.y
+            self.board[y][x] = player.color.lower()
+    def game_start_broad(self,socket):
+        for p in self.players:
+            msg = f"STRT\x1E{self.room_id}\x1E{p.color}\x1E{p.x}\x1E{p.y}"
+            sec = SecureSession(p.aes_key)
+            encrypted = sec.encrypt(msg.encode())
+            socket.sendto(encrypted, p.addr)
+
+    def all_ready(self):
+        if len(self.players) == 0:
+            return False
+        ready_count = 0
+        for p in self.players:
+            if p.ready:
+                ready_count+=1
+        if ready_count == len(self.players):
+            return True
+        return False
     def get_ready_count(self):
         count = 0
         for p in self.players:
@@ -142,10 +207,9 @@ class Room:
         return count
 
     def broadcast_state(self, socket):
-
         self.broadcast(socket, f"STATE|{self.state.name}")
     def reset_room(self):
-        self.players = {}
+        self.players = []
         self.started = False
         self.board = [[''] * BOARD_X_LEN for _ in range(BOARD_Y_LEN)]
         self.colors_left = ['r', 'g', 'b', 'y']
@@ -160,9 +224,8 @@ class Room:
         }
 
     def remove_player(self, player):
-        for i in self.players:
-            if i==player:
-                self.players.remove(player)
+        if player in self.players:
+            self.players.remove(player)
 
     def __str__(self):
         return f"Id: {self.room_id}\nStarted: {self.started}\nPlayerCount: {len(self.players)}"

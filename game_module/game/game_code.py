@@ -17,7 +17,7 @@ def handle_game(addr,aes,socket):
     pygame.init()
     screen = pygame.display.set_mode((SCREEN_X,  SCREEN_Y))
     Sec = SecureSession(aes)
-    game = Game(screen)
+    game = Game(screen,Sec,socket,addr)
     clock = pygame.time.Clock()
     lobby = Lobby(screen,Sec,socket,addr)
     waiting_lobby = Waiting(screen, -1,Sec,socket,addr)
@@ -79,7 +79,27 @@ def handle_listen(Sec,sock,game,lobby,waiting_lobby):
                 room_id = data.split('\x1E')[1]
                 ready_count = data.split('\x1E')[2]
                 waiting_lobby.update_ready_count(int(ready_count))
-
+            if code == 'STRT':
+                room_id = data.split('\x1E')[1]
+                game.color = data.split('\x1E')[2].upper()
+                x = int(data.split('\x1E')[3])
+                y = int(data.split('\x1E')[4])
+                game.board[y][x] = game.color
+                if room_id == waiting_lobby.room_id:
+                    game.gamestate = Status.INGAME
+            if code == 'CNGE':
+                letter = data.split('\x1E')[1]
+                x = int(data.split('\x1E')[2])
+                y = int(data.split('\x1E')[3])
+                game.board[y][x] = letter
+            if code == 'MOVD':
+                old_x = int(data.split('\x1E')[1])
+                old_y = int(data.split('\x1E')[2])
+                x = int(data.split('\x1E')[3])
+                y = int(data.split('\x1E')[4])
+                color = data.split('\x1E')[5]
+                game.board[old_y][old_x] = color.upper()
+                game.board[y][x] = color.lower()
         except TimeoutError:
             pass
     sock.close()

@@ -119,6 +119,7 @@ class Waiting:
 
     def leave(self):
         self.is_ready = False
+        self.player_count = 0
         msg = self.sec.encrypt(b"LEAV\x1E")
         self.sock.sendto(b"ENCR" + msg, self.addr)
 
@@ -129,10 +130,9 @@ class Waiting:
         msg = self.sec.encrypt(f"REDY\x1E{state}".encode())
         self.sock.sendto(b"ENCR" + msg, self.addr)
 
-
     def setId(self, room_id):
         self.room_id = room_id
-
+        self.is_ready = False
     def update_room_count(self, room_id, count):
         self.room_id = room_id
         self.player_count = int(count)
@@ -143,15 +143,26 @@ class Waiting:
     def handle_events(self, game):
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
+                self.leave()
                 game.running = False
 
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
+                    self.leave()
                     game.running = False
 
             self.leave_button.handle_event(event)
             self.ready_button.handle_event(event)
 
+    def update_ready_button(self):
+        if self.is_ready:
+            self.ready_button.text = "Unready"
+            self.ready_button.color = UNREADY_COLOR
+            self.ready_button.hoverColor = UNREADY_HOVER_COLOR
+        else:
+            self.ready_button.text = "Ready"
+            self.ready_button.color = READY_COLOR
+            self.ready_button.hoverColor = READY_HOVER_COLOR
 
     def draw(self):
         self.screen.fill(WAITING_BACKGROUND_COLOR)
@@ -165,14 +176,7 @@ class Waiting:
         status_text = self.font.render(f"Ready: {self.ready_count}/{self.player_count}",True,READY_COUNT_COLOR)
         self.screen.blit(status_text,(SCREEN_X // 2 - status_text.get_width() // 2, READY_COUNT_Y))
 
-        if self.is_ready:
-            self.ready_button.color = READY_COLOR
-            self.ready_button.hoverColor = READY_HOVER_COLOR
-            self.ready_button.text = "Ready"
-        else:
-            self.ready_button.color = UNREADY_COLOR
-            self.ready_button.hoverColor = UNREADY_HOVER_COLOR
-            self.ready_button.text = "Unready"
+        self.update_ready_button()
 
         self.leave_button.draw(self.screen)
         self.ready_button.draw(self.screen)

@@ -7,13 +7,16 @@ import time
 
 
 class Game:
-    def __init__(self, screen):
+    def __init__(self, screen, sec, sock, addr):
         self.running = True
         self.board = [[''] * BOARD_X_LEN for _ in range(BOARD_Y_LEN)]
         self.color = None
         self.room = None
         self.screen = screen
         self.gamestate = Status.LOBBY
+        self.sec = sec
+        self.sock = sock
+        self.addr = addr
 
         self.drawer = Draw(self.board, self.color, self.screen)
 
@@ -28,13 +31,32 @@ class Game:
                 if event.key == pygame.K_ESCAPE:
                     self.running = False
 
-                elif event.key == pygame.K_SPACE:
-                    self.board[random.randint(1, 29)][random.randint(1, 29)] = \
-                        random.choice(['R', 'G', 'B', 'Y'])
+
+                elif event.key == pygame.K_w:
+
+                    self.send_move("UP")
+
+
+                elif event.key == pygame.K_s:
+
+                    self.send_move("DOWN")
+
+
+                elif event.key == pygame.K_a:
+
+                    self.send_move("LEFT")
+
+
+                elif event.key == pygame.K_d:
+
+                    self.send_move("RIGHT")
 
     def INGAME_draw(self):
         self.drawer.draw_ingame()
 
+    def send_move(self, direction):
+        msg = self.sec.encrypt(f"MOVE\x1E{direction}".encode())
+        self.sock.sendto(b"ENCR" + msg, self.addr)
     def COUNTDOWN_draw(self):
         clock = pygame.time.Clock()
 
