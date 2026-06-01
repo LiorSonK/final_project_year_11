@@ -57,6 +57,10 @@ CD_Y = 200
 
 CD_GO_OFFSET = 200
 
+#General
+
+FPS = 60
+
 #FPS
 FPS = 60
 

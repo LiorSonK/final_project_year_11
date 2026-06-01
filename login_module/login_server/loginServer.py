@@ -1,13 +1,13 @@
 import socket
 import threading
 
-from tcp_by_size import send_with_size, recv_by_size
-
+from login_module.login_interface.tcp_by_size import recv_by_size, send_with_size
+from game_module.game_server.Player import Player
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives import serialization, hashes
 from cryptography.hazmat.primitives.asymmetric import rsa, padding
 from cryptography.hazmat.backends import default_backend
-
+from game_module.game_server.server_constants import *
 import os
 
 
@@ -68,7 +68,9 @@ def load_or_create_keys():
     return private_key, public_key
 
 
-def handle_client(cli_sock):
+lock = threading.Lock()
+def handle_client(cli_sock,udp_server):
+    private_key, public_key = load_or_create_keys()
     try:
         exchange_method = recv_by_size(cli_sock)
         if exchange_method != b"RSA":
@@ -93,35 +95,39 @@ def handle_client(cli_sock):
             )
         )
         session = SecureSession(aes_key)
-        encrypted_data = recv_by_size(cli_sock)
-        data = session.decrypt(encrypted_data).decode()
-        parts = data.split("\x1E")
-        if parts[0] == "USER":
-            username = parts[1]
-            print("User connected:", username)
-            response = f"Hello {username}".encode()
-            send_with_size(
-                cli_sock,
-                session.encrypt(response)
-            )
+        while True:
+            encrypted_data = recv_by_size(cli_sock)
+            data = session.decrypt(encrypted_data).decode()
+            parts = data.split("\x1E")
+            if parts[0] == "GET_UDP":
+                username = parts[1]
+                print("User connected:", username)
+                response = f"UDP\x1E{IP}\x1E{PORT}".encode()
+                player = Player(username,None,aes_key)
+                with lock:
+                    udp_server.players.append(player)
+                send_with_size(
+                    cli_sock,
+                    session.encrypt(response)
+                )
+            if parts[0]=="LEAV":
+                break
         cli_sock.close()
     except Exception as e:
         print("Client error:", e)
         cli_sock.close()
 
+def RunSrvr(udp_server):
+    srv_sock = socket.socket()
+    srv_sock.bind(("0.0.0.0", 12345))
+    srv_sock.listen()
 
-private_key, public_key = load_or_create_keys()
+    print("Server listening on port 12345")
 
-srv_sock = socket.socket()
-srv_sock.bind(("0.0.0.0", 12345))
-srv_sock.listen()
+    while True:
 
-print("Server listening on port 12345")
+        client_socket, addr = srv_sock.accept()
 
-while True:
+        print("Connection from", addr)
 
-    client_socket, addr = srv_sock.accept()
-
-    print("Connection from", addr)
-
-    threading.Thread(target=handle_client,args=(client_socket,),daemon=True).start()
+        threading.Thread(target=handle_client,args=(client_socket,udp_server),daemon=True).start()

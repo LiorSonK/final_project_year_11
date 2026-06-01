@@ -1,5 +1,5 @@
 import pygame
-from game_constants import *
+from game_module.game.game_constants import *
 from enum import Enum
 import random
 import time
@@ -54,7 +54,7 @@ class Game:
                 self.screen.fill(WHITE)
                 self.drawer.draw_big(str(3 - i), CD_X, CD_Y)
                 pygame.display.flip()
-                clock.tick(60)
+                clock.tick(FPS)
 
         start_time = pygame.time.get_ticks()
         while pygame.time.get_ticks() - start_time < 500:
@@ -66,7 +66,7 @@ class Game:
             self.screen.fill(WHITE)
             self.drawer.draw_big("Go!", CD_X - CD_GO_OFFSET, CD_Y)
             pygame.display.flip()
-            clock.tick(60)
+            clock.tick(FPS)
 
 
 class Draw:

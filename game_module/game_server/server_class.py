@@ -1,11 +1,10 @@
 import socket
 import json
-
 from game_module.game.game_constants import BOARD_X_LEN, BOARD_Y_LEN
 from server_constants import *
 from game_module.game.game_classes import Status
 import time
-
+from login_module.login_server.loginServer import SecureSession
 class Server:
     def __init__(self,ip,port):
         self.socket = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
@@ -13,15 +12,17 @@ class Server:
         self.shutdown = False
         self.playerCount = 0
         self.rooms = {}
-        self.players = {}
+        self.players = []
     def handle_msg(self,data,addr):
         msg = data.decode()
         cmd = msg[:4]
-
-        if addr not in self.players:
-            self.players[addr] = {"username": "unknown","room": None}
-            self.playerCount+=1
-        player = self.players[addr]
+        if cmd == "CONN":
+            username = msg.split('\x1E')[1]
+            for player in self.players:
+                if player.username == username:
+                    player.addr = addr
+                    self.socket.sendto(b"OK", addr)
+                    return
 
         if cmd == "LIST":
             rooms_data = []
