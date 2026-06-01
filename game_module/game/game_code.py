@@ -1,70 +1,39 @@
 #imports
+import time
+
 import pygame
 from game_constants import *
 from game_classes import Status
 from game_classes import Game
 from game_classes import Draw
 from lobby_class import Lobby
+from lobby_class import Waiting
+import threading
+from login_module.login_interface.login_gui import SecureSession
+from login_module.login_server.loginServer import handle_client
+
 def handle_game(addr,aes,socket):
     #initialize
     pygame.init()
-
     screen = pygame.display.set_mode((SCREEN_X,  SCREEN_Y))
-
-    color = 'R'
-    game = Game(screen,color)
-    gamestate = Status.LOBBY
+    Sec = SecureSession(aes)
+    game = Game(screen)
     clock = pygame.time.Clock()
-    fake_rooms = [
-        (101, 0, 8),  # empty lobby
-        (102, 1, 8),  # just started
-        (103, 6, 8),  # mid game
-        (104, 8, 8),  # full room
-        (105, 3, 4),  # small match
-        (106, 10, 10),  # full
-        (107, 2, 6),
-        (108, 5, 6),
-        (109, 1, 2),
-        (101, 0, 8),  # empty lobby
-        (102, 1, 8),  # just started
-        (103, 6, 8),  # mid game
-        (104, 8, 8),  # full room
-        (105, 3, 4),  # small match
-        (106, 10, 10),  # full
-        (107, 2, 6),
-        (108, 5, 6),
-        (109, 1, 2),
-        (101, 0, 8),  # empty lobby
-        (102, 1, 8),  # just started
-        (103, 6, 8),  # mid game
-        (104, 8, 8),  # full room
-        (105, 3, 4),  # small match
-        (106, 10, 10),  # full
-        (107, 2, 6),
-        (108, 5, 6),
-        (109, 1, 2),
-        (101, 0, 8),  # empty lobby
-        (102, 1, 8),  # just started
-        (103, 6, 8),  # mid game
-        (104, 8, 8),  # full room
-        (105, 3, 4),  # small match
-        (106, 10, 10),  # full
-        (107, 2, 6),
-        (108, 5, 6),
-        (109, 1, 2),
-    ]
-    lobby = Lobby(screen)
-    lobby.set_rooms(fake_rooms)
-
+    lobby = Lobby(screen,Sec,socket,addr)
+    waiting_lobby = Waiting(screen, -1,Sec,socket,addr)
+    t = threading.Thread(target=handle_listen, args=(Sec,socket,game,lobby,waiting_lobby), daemon=True)
+    t.start()
     #game loop
     while game.running:
-        match gamestate:
+        match game.gamestate:
             case Status.LOBBY:
                 lobby.handle_events(game)
                 lobby.draw()
                 pygame.display.flip()
             case Status.WAITING_FOR_PLAYERS:
-                pass
+                waiting_lobby.draw()
+                waiting_lobby.handle_events(game)
+                pygame.display.flip()
             case Status.COUNTDOWN:
                 game.COUNTDOWN_draw()
                 gamestate = Status.INGAME
@@ -74,4 +43,44 @@ def handle_game(addr,aes,socket):
             case Status.COMPLETED:
                 pass
         clock.tick(FPS)
+    t.join()
     pygame.quit()
+def handle_listen(Sec,sock,game,lobby,waiting_lobby):
+    sock.settimeout(0.5)
+    while game.running:
+        try:
+            data,addr = sock.recvfrom(1024)
+            data = Sec.decrypt(data).decode()
+            code = data.split('\x1E')[0]
+            if code == 'RMDT':
+                info = data.split('\x1E')[1]
+                info = info.split('|')
+                rooms_data = []
+                for i in info:
+                    if(len(i)>0):
+                        i = i.split('\n')
+                        id = i[0]
+                        player_count = i[2]
+                        rooms_data.append((id.split(':')[1].strip(),player_count.split(':')[1].strip()))
+                lobby.set_rooms(rooms_data)
+            if code == 'JOND':
+                id = data.split('\x1E')[1]
+                waiting_lobby.setId(id)
+                game.gamestate = Status.WAITING_FOR_PLAYERS
+            if code == 'LEFT':
+                waiting_lobby.setId(-1)
+                game.gamestate = Status.LOBBY
+            if code == 'PLCN':
+                room_id = data.split('\x1E')[1]
+                count = data.split('\x1E')[2]
+
+                waiting_lobby.update_room_count(room_id, count)
+            if code == "RDYC":
+                room_id = data.split('\x1E')[1]
+                ready_count = data.split('\x1E')[2]
+                waiting_lobby.update_ready_count(int(ready_count))
+
+        except TimeoutError:
+            pass
+    sock.close()
+

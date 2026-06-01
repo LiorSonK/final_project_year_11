@@ -7,11 +7,13 @@ import time
 
 
 class Game:
-    def __init__(self, screen, color):
+    def __init__(self, screen):
         self.running = True
         self.board = [[''] * BOARD_X_LEN for _ in range(BOARD_Y_LEN)]
-        self.color = color
+        self.color = None
+        self.room = None
         self.screen = screen
+        self.gamestate = Status.LOBBY
 
         self.drawer = Draw(self.board, self.color, self.screen)
 

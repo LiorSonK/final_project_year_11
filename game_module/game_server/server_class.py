@@ -11,90 +11,84 @@ class Server:
         self.socket.bind((ip,port))
         self.shutdown = False
         self.playerCount = 0
-        self.rooms = {}
+        self.rooms = []
         self.players = []
     def handle_msg(self,data,addr):
-        msg = data.decode()
-        cmd = msg[:4]
-        if cmd == "CONN":
-            username = msg.split('\x1E')[1]
-            for player in self.players:
-                if player.username == username:
-                    player.addr = addr
-                    self.socket.sendto(b"OK", addr)
-                    return
-
-        if cmd == "LIST":
-            rooms_data = []
-            for r in self.rooms.values():
-                rooms_data.append(f"{r.room_id},{len(r.players)}/{r.max_players}")
-
-            self.socket.sendto(("ROOMS|" + ";".join(rooms_data)).encode(),addr)
-
-        elif cmd == "JOIN":
-            room_id = int(msg[5:])
-            if player["room"] is not None:
-                old = self.rooms[player["room"]]
-                if addr in old.players:
-                    old.remove_player(addr)
-
-            room = self.rooms[room_id]
-            room.add_player(addr,player["username"])
-            player["room"] = room_id
-
-            self.socket.sendto(f"JOIN_OK|{room_id}".encode(),addr)
-            self.broadcast_room(room_id, f"PLAYER_JOIN|{addr}")
-
-        elif cmd == "LEAV":
-            if player["room"] is not None:
-                room = self.rooms[player["room"]]
-                room.remove_player(addr)
-                self.broadcast_room(player["room"], f"PLAYER_LEAVE|{addr}")
-                player["room"] = None
-            self.socket.sendto(b"LEFT", addr)
-        elif cmd == "BORD":
-            if player["room"] is None:
-                self.socket.sendto(b"ERR|NO_ROOM", addr)
+        msg = data
+        encryption = msg[:4].decode()
+        if encryption == "NOEN":
+            msg = msg[4:].decode()
+            cmd = msg.split('\x1E')[0]
+            if cmd == "CONN":
+                username = msg.split('\x1E')[1]
+                for player in self.players:
+                    if player.username == username:
+                        player.addr = addr
+                        self.socket.sendto(b"OK", addr)
+                        return
+        if encryption == "ENCR":
+            player = self.find_player(addr)
+            if player is None:
+                print("JOIN FAILED: player not registered", addr)
                 return
-            room = self.rooms[player["room"]]
-            msg = "BOARD|" + json.dumps(room.board)
-            self.socket.sendto(msg.encode(), addr)
+            secure = SecureSession(player.aes_key)
 
-        elif cmd == "MOVE":
+            msg = secure.decrypt(msg[4:]).decode()
+            cmd = msg.split('\x1E')[0]
+            to_send = ""
+            if cmd=="ROMS":
+                to_send = "RMDT\x1E"
+                for i in self.rooms:
+                    to_send += str(i)+"|"
+                to_send = secure.encrypt(to_send.encode())
+                self.socket.sendto(to_send, addr)
+            if cmd=="JOIN":
+                room_id = msg.split('\x1E')[1]
+                for i in self.rooms:
+                    if i.room_id==int(room_id):
+                        if len(i.players)<4:
+                            player.room = i
+                            i.players.append(player)
+                            to_send = f"JOND\x1E{i.room_id}"
+                to_send = secure.encrypt(to_send.encode())
+                self.socket.sendto(to_send,addr)
+                if to_send !="":
+                    br = f"PLCN\x1E{player.room.room_id}\x1E{len(player.room.players)}"
+                    player.room.broadcast(self.socket, br)
+            if cmd=="LEAV":
+                room = None
+                if player.room != None:
+                    room = player.room
+                    player.room.remove_player(player)
+                    player.room = None
+                to_send = f"LEFT\x1E"
+                to_send = secure.encrypt(to_send.encode())
+                self.socket.sendto(to_send,addr)
+                if room != None:
+                    br = f"PLCN\x1E{room.room_id}\x1E{len(room.players)}"
+                    room.broadcast(self.socket, br)
+            if cmd == "REDY":
+                state = msg.split('\x1E')[1]
+                player.ready = (state == "1")
 
-            if player["room"] is None:
-                return
+                room = player.room
+                if room:
+                    ready_count = room.get_ready_count()
 
-            direction = msg[5:]
-            room = self.rooms[player["room"]]
-            room_player = room.players[addr]
-            color = room_player["color"]
-            self.broadcast_room(player["room"],f"POS|{color.lower()}|{room_player['x']}|{room_player['y']}")
-
-            if direction == "UP":
-                room_player["y"] -= 1
-            elif direction == "DOWN":
-                room_player["y"] += 1
-            elif direction == "LEFT":
-                room_player["x"] -= 1
-            elif direction == "RIGHT":
-                room_player["x"] += 1
-
-            self.broadcast_room(player["room"],f"POS|{color.upper()}|{room_player['x']}|{room_player['y']}")
-
-    def broadcast_room(self, room_id, msg):
-        room = self.rooms[room_id]
-
-        for addr in room.players:
-            self.socket.sendto(msg.encode(), addr)
-
+                    msg = f"RDYC\x1E{room.room_id}\x1E{ready_count}"
+                    room.broadcast(self.socket, msg)
+    def find_player(self,addr):
+        for player in self.players:
+            if player.addr == addr:
+                return player
+        return None
     def start_rooms(self):
-        for i in range(5):
-            self.rooms[i] = Room(i)
+        for i in range(1, 6):
+            self.rooms.append(Room(i))
 
     def add_room(self):
-        if len(self.rooms)<9:
-            self.rooms[len(self.rooms)] = Room(len(self.rooms))
+        if len(self.rooms)<30:
+            self.rooms.append(Room(len(self.rooms)+1))
 
     def print_rooms(self):
         for i in self.rooms:
@@ -104,7 +98,7 @@ class Room:
     def __init__(self, room_id):
         self.room_id = room_id
         self.max_players = MAX_PLAYERS
-        self.players = {}
+        self.players = []
         self.started = False
         self.board = []
         self.colors_left = ['r', 'g', 'b', 'y']
@@ -136,9 +130,16 @@ class Room:
             self.state = Status.WAITING_FOR_PLAYERS
 
     def broadcast(self, socket, msg):
-
-        for addr in self.players:
-            socket.sendto(msg.encode(), addr)
+        for player in self.players:
+            sec = SecureSession(player.aes_key)
+            encrypted = sec.encrypt(msg.encode())
+            socket.sendto(encrypted, player.addr)
+    def get_ready_count(self):
+        count = 0
+        for p in self.players:
+            if p.ready == True:
+                count+=1
+        return count
 
     def broadcast_state(self, socket):
 
@@ -158,11 +159,10 @@ class Room:
             "username": username
         }
 
-    def remove_player(self, addr):
-        if addr in self.players:
-            color = self.players[addr]["color"]
-            self.colors_left.append(color)
-            del self.players[addr]
+    def remove_player(self, player):
+        for i in self.players:
+            if i==player:
+                self.players.remove(player)
 
     def __str__(self):
         return f"Id: {self.room_id}\nStarted: {self.started}\nPlayerCount: {len(self.players)}"

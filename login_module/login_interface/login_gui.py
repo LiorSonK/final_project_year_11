@@ -1,7 +1,6 @@
 import tkinter as tk
 import socket
 import os
-from distutils.core import setup_keywords
 
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives import hashes, serialization
@@ -22,6 +21,11 @@ class SecureSession:
         ciphertext = data[12:]
         return self.aesgcm.decrypt(nonce, ciphertext, None)
 
+def encr_prefix(msg):
+    return "ENCR"+msg
+
+def noen_prefix(msg):
+    return "NOEN"+msg
 
 class LoginClient:
     def __init__(self):
@@ -143,7 +147,7 @@ class LoginClient:
         udp_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         udp_sock.settimeout(3)
         username = self.entry.get().strip()
-        msg = f"CONN\x1E{username}".encode()
+        msg = noen_prefix(f"CONN\x1E{username}").encode()
         for i in range(5):
             udp_sock.sendto(msg, (ip, port))
             try:
