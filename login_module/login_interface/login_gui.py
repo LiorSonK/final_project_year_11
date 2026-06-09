@@ -60,7 +60,7 @@ class LoginClient:
 
         try:
             self.sock = socket.socket()
-            self.sock.connect(("127.0.0.1", 12345))
+            self.sock.connect(("0.0.0.0", 12345))
 
             aes_key = AESGCM.generate_key(bit_length=256)
 
