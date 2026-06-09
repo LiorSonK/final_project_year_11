@@ -19,7 +19,9 @@ class Game:
         self.addr = addr
 
         self.drawer = Draw(self.board, self.color, self.screen)
-
+    def reset_board(self):
+        self.board = [[''] * BOARD_X_LEN for _ in range(BOARD_Y_LEN)]
+        self.drawer.board = self.board
     def INGAME_handle_events(self):
         for event in pygame.event.get():
 

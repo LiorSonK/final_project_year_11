@@ -95,20 +95,31 @@ class Server:
 
                 old_x, old_y = player.x, player.y
 
+                new_x, new_y = player.x, player.y
+
                 if direction == "UP":
-                    player.y -= 1
+                    new_y -= 1
                 elif direction == "DOWN":
-                    player.y += 1
+                    new_y += 1
                 elif direction == "LEFT":
-                    player.x -= 1
+                    new_x -= 1
                 elif direction == "RIGHT":
-                    player.x += 1
+                    new_x += 1
 
-                player.x = max(0, min(BOARD_X_LEN - 1, player.x))
-                player.y = max(0, min(BOARD_Y_LEN - 1, player.y))
+                new_x = max(0, min(BOARD_X_LEN - 1, new_x))
+                new_y = max(0, min(BOARD_Y_LEN - 1, new_y))
 
-                msg = f"MOVD\x1E{old_x}\x1E{old_y}\x1E{player.x}\x1E{player.y}\x1E{player.color.lower()}"
-                player.room.broadcast(self.socket, msg)
+                if player.room.board[new_y][new_x] == "":
+                    player.x, player.y = new_x, new_y
+                    player.room.board[new_y][new_x] = player.color.lower()
+
+                    msg = f"MOVD\x1E{old_x}\x1E{old_y}\x1E{new_x}\x1E{new_y}\x1E{player.color.lower()}"
+                    player.room.broadcast(self.socket, msg)
+
+                if player.room.full_board() == "close":
+                    msg = "CLOS\x1E"
+                    player.room.broadcast(self.socket, msg)
+                    player.room.reset_room()
     def find_player(self,addr):
         for player in self.players:
             if player.addr == addr:
@@ -209,11 +220,19 @@ class Room:
     def broadcast_state(self, socket):
         self.broadcast(socket, f"STATE|{self.state.name}")
     def reset_room(self):
+        for player in self.players:
+            player.room = None
+            player.color = None
         self.players = []
         self.started = False
         self.board = [[''] * BOARD_X_LEN for _ in range(BOARD_Y_LEN)]
         self.colors_left = ['r', 'g', 'b', 'y']
-
+    def full_board(self):
+        for i in self.board:
+            for j in i:
+                if j == '':
+                    return
+        return "close"
     def add_player(self, addr, username):
         color = self.colors_left.pop(0)
         self.players[addr] = {

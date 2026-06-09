@@ -70,6 +70,13 @@ def handle_listen(Sec,sock,game,lobby,waiting_lobby):
             if code == 'LEFT':
                 waiting_lobby.setId(-1)
                 game.gamestate = Status.LOBBY
+            if code == 'CLOS':
+                game.gamestate = Status.LOBBY
+                game.color = None
+                game.room = None
+                game.reset_board()
+                lobby.set_rooms([])
+                waiting_lobby.setId(-1)
             if code == 'PLCN':
                 room_id = data.split('\x1E')[1]
                 count = data.split('\x1E')[2]
