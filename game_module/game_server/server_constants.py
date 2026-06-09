@@ -1,6 +1,6 @@
 #Connections
 
-IP = '0.0.0.0'
+IP = '192.168.1.221'
 PORT = 11111
 MAX_CONNECTED = 100
 
